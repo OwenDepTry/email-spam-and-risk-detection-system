@@ -1,0 +1,18 @@
+# Môi trường ảo
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Dữ liệu tải về và model sinh ra khi train (tái tạo bằng `python train.py`)
+data/sms_spam.csv
+models/
+logs/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
