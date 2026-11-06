@@ -63,6 +63,7 @@ _CSS = """
 .sd-step .dd{opacity:.75;font-size:.92rem}
 .sd-hl{line-height:2.1;font-size:1.02rem}
 .sd-hl span{border-radius:4px;padding:1px 3px}
+.sd-hl span.sd-na{color:#94a3b8;text-decoration:underline dotted}
 .sd-note{font-size:.85rem;opacity:.7}
 """
 
@@ -94,20 +95,25 @@ def kpi_list(items) -> str:
 
 
 def risk_level(spam_prob_pct: float) -> tuple[str, str]:
-    """(mô tả, màu) theo xác suất spam (%)."""
+    """(mô tả, màu) theo xác suất spam (%) của mô hình.
+
+    Đây chỉ là mức của ĐIỂM SPAM, không phải mức rủi ro/thiệt hại hay khả năng lừa đảo: các mốc 25/50/75
+    chưa được kiểm chứng bằng nhãn rủi ro và xác suất chưa được đánh giá calibration. Dấu hiệu lừa đảo
+    được hiển thị riêng (signals.py).
+    """
     if spam_prob_pct < 25:
-        return "Rủi ro thấp", HAM_COLOR
+        return "Điểm spam thấp", HAM_COLOR
     if spam_prob_pct < 50:
-        return "Rủi ro trung bình", "#eab308"
+        return "Điểm spam trung bình", "#eab308"
     if spam_prob_pct < 75:
-        return "Rủi ro cao", "#f97316"
-    return "Rủi ro rất cao", SPAM_COLOR
+        return "Điểm spam cao", "#f97316"
+    return "Điểm spam rất cao", SPAM_COLOR
 
 
 def verdict_card(label: str, confidence: float, model_label: str, elapsed_ms: float) -> str:
     is_spam = label == "Spam"
     word = "🚨 SPAM" if is_spam else "✅ HAM — email thường"
-    detail = f"Độ tin cậy {confidence:.1f}% · Mô hình: {model_label} · {elapsed_ms:.0f} ms"
+    detail = f"Điểm của mô hình {confidence:.1f}% (chưa hiệu chỉnh) · Mô hình: {model_label} · {elapsed_ms:.0f} ms"
     return (f'<div class="sd-verdict {"spam" if is_spam else "ham"}"><div class="k">Kết luận</div>'
             f'<div class="w">{_e(word)}</div><div class="d">{_e(detail)}</div></div>')
 
@@ -199,6 +205,9 @@ def highlight_html(tokens: list[dict]) -> str:
     parts = []
     for item in tokens:
         impact, safe = item["impact"], _e(item["token"])
+        if impact is None:  # nằm ngoài giới hạn số từ được phân tích
+            parts.append(f'<span class="sd-na" title="Chưa phân tích">{safe}</span>')
+            continue
         if abs(impact) < 0.01:
             parts.append(safe)
             continue

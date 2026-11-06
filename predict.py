@@ -97,7 +97,8 @@ def explain_email(text: str, model_name: str | None = None, max_tokens: int = 80
 
     Trả về danh sách {'token', 'impact'} theo đúng thứ tự trong văn bản.
     impact > 0: từ đó đẩy email về phía spam; impact < 0: đẩy về phía ham.
-    Chỉ tính cho `max_tokens` từ đầu tiên để giữ thời gian phản hồi nhanh.
+    Chỉ tính cho `max_tokens` từ đầu tiên để giữ thời gian phản hồi nhanh; các từ sau đó có
+    impact = None (CHƯA phân tích), khác với impact = 0 (đã phân tích, không ảnh hưởng).
     """
     tokens = text.split()
     if not tokens:
@@ -106,8 +107,30 @@ def explain_email(text: str, model_name: str | None = None, max_tokens: int = 80
     variants = [" ".join(tokens[:i] + tokens[i + 1:]) for i in range(n)]
     base = float(spam_probabilities([text], model_name, model_dir)[0])
     probs = spam_probabilities(variants, model_name, model_dir)
-    impacts = [base - float(p) for p in probs] + [0.0] * (len(tokens) - n)
-    return [{"token": tok, "impact": round(imp, 4)} for tok, imp in zip(tokens, impacts)]
+    impacts = [round(base - float(p), 4) for p in probs] + [None] * (len(tokens) - n)
+    return [{"token": tok, "impact": imp} for tok, imp in zip(tokens, impacts)]
+
+
+def evaluate_labels(true_labels, predicted_labels) -> dict | None:
+    """Accuracy / precision / recall (lớp spam) CHỈ trên các dòng có nhãn thật hợp lệ.
+
+    Nhãn hợp lệ: spam/ham hoặc 1/0 (không phân biệt hoa thường). Dòng thiếu nhãn bị bỏ khỏi MỌI chỉ số
+    (trước đây precision vẫn đếm cả dự đoán spam ở dòng không có nhãn). Trả về None nếu không có dòng hợp lệ.
+    """
+    mapping = {"spam": "Spam", "1": "Spam", "1.0": "Spam", "ham": "Ham", "0": "Ham", "0.0": "Ham"}
+    pairs = [(mapping.get(str(t).strip().lower()), p) for t, p in zip(true_labels, predicted_labels)]
+    pairs = [(t, p) for t, p in pairs if t is not None]
+    if not pairs:
+        return None
+    tp = sum(t == "Spam" and p == "Spam" for t, p in pairs)
+    pred_spam = sum(p == "Spam" for _, p in pairs)
+    true_spam = sum(t == "Spam" for t, _ in pairs)
+    return {
+        "n_labeled": len(pairs),
+        "accuracy": sum(t == p for t, p in pairs) / len(pairs),
+        "precision": tp / pred_spam if pred_spam else None,
+        "recall": tp / true_spam if true_spam else None,
+    }
 
 
 # ----------------------------------------------------------------------------- CLI
@@ -122,7 +145,8 @@ def main() -> None:
     content = " ".join(args.text) or input("Nhập nội dung email: ")
     print(predict_email(content, args.model, args.threshold))
     if args.explain:
-        top = sorted(explain_email(content, args.model), key=lambda d: abs(d["impact"]), reverse=True)[:8]
+        scored = [d for d in explain_email(content, args.model) if d["impact"] is not None]
+        top = sorted(scored, key=lambda d: abs(d["impact"]), reverse=True)[:8]
         for item in top:
             print(f"  {item['impact']:+.3f}  {item['token']}")
 

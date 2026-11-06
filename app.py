@@ -7,7 +7,8 @@ import pandas as pd
 import streamlit as st
 
 import ui_components as ui
-from predict import DEFAULT_THRESHOLD, explain_email, load_metrics, predict_all_models, predict_batch, predict_email
+from predict import (DEFAULT_THRESHOLD, evaluate_labels, explain_email, load_metrics, predict_all_models,
+                     predict_batch, predict_email)
 from signals import detect_signals
 from storage import log_feedback, read_feedback
 
@@ -127,7 +128,7 @@ if page == PAGES[0]:
         ("Nhập tiêu đề và nội dung", "Dán email hoặc tin nhắn tiếng Anh vào trang Kiểm tra email."),
         ("Làm sạch và trích đặc trưng", "Chuẩn hóa văn bản, TF-IDF (1-2 từ) cùng số link, chữ HOA, dấu !, ký hiệu tiền..."),
         ("Nhiều mô hình bỏ phiếu", "Naive Bayes, Logistic Regression và SVM cho xác suất, Soft Voting lấy trung bình."),
-        ("Kết luận kèm giải thích", "Spam hay Ham, độ tin cậy, từ nào ảnh hưởng nhất và các dấu hiệu đáng ngờ."),
+        ("Kết luận kèm giải thích", "Spam hay Ham, điểm spam của mô hình, từ nào ảnh hưởng nhất và các dấu hiệu đáng ngờ."),
     ])))
     st.caption("Giới hạn: chỉ xử lý nội dung văn bản tiếng Anh, chưa xử lý file đính kèm hay header email.")
 
@@ -181,6 +182,10 @@ elif page == PAGES[1]:
         st.subheader("Vì sao có kết quả này?")
         html(ui.highlight_html(last["tokens"]))
         st.caption("🟥 từ đẩy về phía spam · 🟩 từ đẩy về phía ham · rê chuột lên từ để xem mức ảnh hưởng")
+        n_skipped = sum(1 for t in last["tokens"] if t["impact"] is None)
+        if n_skipped:
+            st.caption(f"⚪ {n_skipped} từ cuối (gạch chân chấm) **chưa được phân tích** để giữ tốc độ, "
+                       "không có nghĩa là chúng không ảnh hưởng đến kết quả.")
 
         st.divider()
         if last["feedback"]:
@@ -229,17 +234,17 @@ elif page == PAGES[2]:
         html(ui.card("Tỉ lệ spam trong file", ui.donut(n_spam, len(out) - n_spam)))
 
         if batch["label_col"] and batch["label_col"] in out.columns:
-            truth = out[batch["label_col"]].astype(str).str.strip().str.lower().map(
-                {"spam": "Spam", "1": "Spam", "ham": "Ham", "0": "Ham"})
-            valid = truth.notna()
-            if valid.any():
-                acc = float((truth[valid] == out.loc[valid, "predicted_label"]).mean())
-                tp = int(((truth == "Spam") & (out["predicted_label"] == "Spam")).sum())
+            ev = evaluate_labels(out[batch["label_col"]], out["predicted_label"])
+            if ev:
+                def pct(v):
+                    return "—" if v is None else f"{v:.1%}"
                 html(ui.kpi_list([
-                    ("Accuracy", f"{acc:.1%}"),
-                    ("Precision (spam)", f"{tp / max(n_spam, 1):.1%}"),
-                    ("Recall (spam)", f"{tp / max(int((truth == 'Spam').sum()), 1):.1%}"),
+                    ("Accuracy", pct(ev["accuracy"])),
+                    ("Precision (spam)", pct(ev["precision"])),
+                    ("Recall (spam)", pct(ev["recall"])),
                 ]))
+                if ev["n_labeled"] < len(out):
+                    st.caption(f"Chỉ số tính trên {ev['n_labeled']:,}/{len(out):,} dòng có nhãn hợp lệ.")
             else:
                 st.warning("Cột nhãn không có giá trị hợp lệ (spam/ham hoặc 1/0) nên không tính được độ chính xác.")
 
@@ -264,7 +269,9 @@ elif page == PAGES[3]:
             ("Tập train / test", f"{DS['n_train']:,} / {DS['n_test']:,}"),
             ("Cross-validation", f"{DS['cv_folds']} folds" if DS["cv_folds"] >= 2 else "không")]
     if DS.get("n_feedback"):
-        kpis.append(("Phản hồi người dùng đã đưa vào train", f"{DS['n_feedback']:,}"))
+        kpis.append(("Phản hồi người dùng đã đưa vào train", f"{DS.get('n_feedback_used', DS['n_feedback']):,}"))
+        if DS.get("n_feedback_in_test"):
+            kpis.append(("Phản hồi bị bỏ qua (trùng tập test)", f"{DS['n_feedback_in_test']:,}"))
     html(ui.kpi_list(kpis))
 
     st.subheader("So sánh các mô hình (tập test)")

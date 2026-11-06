@@ -5,6 +5,7 @@ link rút gọn, từ khẩn cấp, nhắc đến tiền thưởng, yêu cầu t
 tham khảo, không dùng để quyết định nhãn Spam/Ham.
 """
 import re
+from urllib.parse import urlsplit
 
 from preprocess import URL_RE
 
@@ -40,6 +41,25 @@ def _unique(matches: list[str], limit: int = 4) -> list[str]:
     return out[:limit]
 
 
+def url_hostname(url: str) -> str:
+    """Hostname (chữ thường, bỏ 'www.') của một URL tìm thấy trong văn bản; '' nếu không phân tích được."""
+    url = url.strip().rstrip(".,;:!?)]}>\"'")
+    if not re.match(r"[a-z][a-z0-9+.-]*://", url, re.IGNORECASE):
+        url = "http://" + url  # dạng www.example.com
+    try:
+        host = urlsplit(url).hostname or ""
+    except ValueError:
+        return ""
+    return host[4:] if host.startswith("www.") else host
+
+
+def is_shortener(url: str) -> bool:
+    """So khớp theo hostname: 'bit.ly' hoặc tên miền con của nó, không so khớp chuỗi con trong cả URL
+    (trước đây 'microsoft.com' bị nhận nhầm vì chứa 't.co', '.../bit.ly-guide' cũng bị nhận nhầm)."""
+    host = url_hostname(url)
+    return any(host == s or host.endswith("." + s) for s in SHORTENERS)
+
+
 def detect_signals(text: str) -> list[dict]:
     """Trả về danh sách {'id', 'title', 'detail', 'severity': high|medium|low}, nghiêm trọng nhất xếp trước."""
     if not isinstance(text, str) or not text.strip():
@@ -47,7 +67,7 @@ def detect_signals(text: str) -> list[dict]:
     signals: list[dict] = []
 
     urls = URL_RE.findall(text)
-    short = [u for u in urls if any(s in u.lower() for s in SHORTENERS)]
+    short = [u for u in urls if is_shortener(u)]
     if short:
         signals.append({"id": "short_link", "severity": "high", "title": "Link rút gọn",
                         "detail": "Che giấu địa chỉ thật: " + ", ".join(short[:2])})

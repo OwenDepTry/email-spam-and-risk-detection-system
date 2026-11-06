@@ -3,6 +3,7 @@
 Các hàm ở đây được viết ở mức module (không dùng lambda) để pipeline sklearn
 có thể lưu bằng joblib và nạp lại an toàn.
 """
+import hashlib
 import html
 import re
 
@@ -23,7 +24,7 @@ STOPWORDS = {
     "yourself", "yourselves",
 }
 
-URL_RE = re.compile(r"https?://\S+|www\.\S+")
+URL_RE = re.compile(r"https?://\S+|www\.\S+", re.IGNORECASE)  # bắt cả HTTPS://, WWW.
 EMAIL_RE = re.compile(r"\S+@\S+")
 NUMBER_RE = re.compile(r"\d+")
 NON_ALPHA_RE = re.compile(r"[^a-z\s]")
@@ -53,6 +54,24 @@ def clean_text(text: str) -> str:
     text = NON_ALPHA_RE.sub(" ", text)
     tokens = [t for t in MULTI_SPACE_RE.sub(" ", text).split() if t not in STOPWORDS and len(t) > 1]
     return " ".join(tokens)
+
+
+def normalize_whitespace(text) -> str:
+    """Bỏ khoảng trắng đầu/cuối và gộp khoảng trắng liên tiếp. Dùng để bỏ trùng dữ liệu."""
+    if not isinstance(text, str):
+        return ""
+    return MULTI_SPACE_RE.sub(" ", text).strip()
+
+
+def group_key(text) -> str:
+    """Khóa nhóm khi chia train/test: các tin giống nhau sau làm sạch (khác số, link, dấu câu,
+    chữ hoa...) có cùng khóa và luôn được xếp về cùng một phía, tránh rò rỉ giữa train và test.
+
+    Không dùng khóa này để XÓA mẫu: việc thay số/URL có thể làm hai tin khác nhau trùng khóa, nên
+    chỉ gom chúng vào cùng nhóm (an toàn hơn), không bỏ đi.
+    """
+    key = clean_text(text) or normalize_whitespace(text).lower()
+    return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
 
 
 def clean_series(texts) -> list[str]:

@@ -27,7 +27,7 @@ Có unit test (pytest).
 
 ```
 Văn bản gốc ─┬─ clean_text → TF-IDF (1-2 gram) ─┐
-             └─ đặc trưng thủ công → MinMax ────┴─► Soft Voting (NB + LR + SVM) ─► P(spam) ─► Spam/Ham + độ tin cậy
+             └─ đặc trưng thủ công → MinMax ────┴─► Soft Voting (NB + LR + SVM) ─► P(spam) ─► Spam/Ham + điểm spam
 ```
 
 Toàn bộ tiền xử lý nằm **bên trong** sklearn `Pipeline`, nên model đã lưu nhận trực tiếp văn bản gốc
@@ -71,6 +71,9 @@ python predict.py --model nb "Hi, can we move the meeting to 3pm?"
 
 Dùng dữ liệu riêng: `python train.py --data my_data.csv` (CSV có cột `label` = spam/ham và `text`).
 Huấn luyện lại có thêm phản hồi người dùng: `python train.py --use-feedback`.
+Phản hồi chỉ được đưa vào tập **train**; tập test được khóa trong `models/test_split.json` nên các lần
+retrain so sánh được với nhau. Phản hồi trùng với tin trong tập test bị bỏ qua; phản hồi cho một tin đã có
+trong train sẽ thay nhãn gốc (phản hồi mới nhất được ưu tiên). Muốn chia lại tập test: `python train.py --resplit`.
 
 Chạy test:
 
@@ -81,15 +84,32 @@ pytest
 
 ## Kết quả
 
-Chạy `python train.py` để sinh bảng so sánh các mô hình trên tập test (dữ liệu SMS Spam Collection, 5169 mẫu sau khi bỏ trùng),
-rồi dán kết quả của bạn vào đây (trang "Hiệu năng mô hình" trong app hiển thị cùng số liệu):
+SMS Spam Collection (UCI), 5.158 mẫu sau khi bỏ trùng (642 spam / 4.516 ham). Chia **theo nhóm**:
+4.126 train / 1.032 test (129 spam), seed 42, 5-fold `StratifiedGroupKFold` trên train,
+scikit-learn 1.9.1. Precision / Recall / F1 tính cho lớp spam.
 
-| Model | CV F1 (spam) | Accuracy | Precision | Recall | F1 |
-|-------|-------------|----------|-----------|--------|----|
-| MultinomialNB | | | | | |
-| LogisticRegression | | | | | |
-| LinearSVC (calibrated) | | | | | |
-| Soft Voting | | | | | |
+| Model | CV F1 (spam) | Accuracy | Precision | Recall | F1 | FP | FN |
+|-------|-------------|----------|-----------|--------|----|----|----|
+| MultinomialNB ⭐ | 95,26% | 99,03% | 100,00% | 92,25% | 95,97% | 0 | 10 |
+| LogisticRegression | 90,01% | 97,00% | 85,51% | 91,47% | 88,39% | 20 | 11 |
+| LinearSVC (calibrated) | 94,81% | 98,45% | 96,69% | 90,70% | 93,60% | 4 | 12 |
+| Soft Voting | 95,18% | 98,55% | 97,50% | 90,70% | 93,98% | 3 | 12 |
+
+⭐ được chọn theo CV F1 trên train. NB và Soft Voting chênh nhau rất ít (95,26% so với 95,18%),
+nên lựa chọn giữa hai mô hình này nằm trong mức nhiễu.
+
+**Về cách chia dữ liệu.** Phiên bản trước chia ngẫu nhiên sau khi chỉ bỏ trùng theo chuỗi gốc,
+nên 33/1.034 tin trong test trùng với tin trong train sau làm sạch. Kiểm tra trên 5 seed (F1 spam trên test):
+
+| Cách chia | MultinomialNB | Soft Voting |
+|-----------|---------------|-------------|
+| Ngẫu nhiên (cũ) | 95,99% ± 1,43 | 95,48% ± 1,40 |
+| Theo nhóm (mới) | 95,13% ± 0,27 | 95,81% ± 0,55 |
+
+Rò rỉ làm kết quả NB lạc quan khoảng 1 điểm; với Soft Voting không thấy khác biệt rõ.
+Kết quả theo một seed có thể dao động hơn 1 điểm, nên khi so sánh mô hình nên báo cáo trung bình nhiều lần chia.
+
+**Lưu ý:** đây là dữ liệu SMS. Chưa thể dùng các con số này để kết luận về email hay phishing thực tế.
 
 ## Giới hạn
 
@@ -103,5 +123,6 @@ rồi dán kết quả của bạn vào đây (trang "Hiệu năng mô hình" tr
 - [x] UI nhiều trang, giải thích kết quả, phân loại hàng loạt, vòng lặp phản hồi
 - [ ] REST API với FastAPI (`POST /predict`, `POST /predict/batch`), UI gọi qua API
 - [ ] Dockerfile + GitHub Actions (chạy pytest)
+- [ ] Duyệt feedback trước khi đưa vào train; phân quyền xem trang phản hồi (hiện ai cũng xem/tải được toàn bộ)
 - [ ] Lưu log/feedback vào SQL database (SQLite → PostgreSQL), retrain định kỳ từ feedback
 - [ ] Thử mô hình BERT (DistilBERT) để so sánh với ensemble hiện tại

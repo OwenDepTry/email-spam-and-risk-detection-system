@@ -1,5 +1,9 @@
-pandas>=2.0
-scikit-learn>=1.3
-joblib>=1.3
-streamlit>=1.30
-requests>=2.31
+# Khóa phiên bản thư viện ảnh hưởng đến kết quả huấn luyện và file .joblib (đã kiểm tra với Python 3.13).
+# Mô hình .joblib chỉ nên nạp bằng đúng phiên bản scikit-learn đã dùng để train.
+numpy==2.5.3
+pandas==3.0.5
+scikit-learn==1.9.1
+joblib==1.6.0
+requests==2.34.2
+# Giao diện: chưa khóa cứng vì chưa kiểm tra lại toàn bộ app với một bản cụ thể.
+streamlit>=1.30,<2
