@@ -1,2 +1,6 @@
 -r requirements.txt
 pytest==9.1.1
+jupyterlab>=4,<5
+matplotlib>=3.8
+jupytext>=1.16
+nbstripout>=0.7
