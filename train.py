@@ -24,6 +24,7 @@ Cách dùng:
     python train.py --use-feedback       # thêm phản hồi 👍/👎 từ giao diện (logs/feedback.csv) vào dữ liệu train
 """
 import argparse
+import csv
 import hashlib
 import io
 import json
@@ -64,13 +65,24 @@ MODEL_NAMES = list(MODEL_LABELS)
 
 
 # ----------------------------------------------------------------------------- dữ liệu
+def parse_uci_tsv(f) -> pd.DataFrame:
+    """Đọc file SMSSpamCollection gốc: mỗi dòng là `label<TAB>text`.
+
+    Phải tắt xử lý dấu ngoặc kép (QUOTE_NONE): file có tin nhắn bắt đầu bằng `"` mà không đóng lại,
+    cách đọc mặc định sẽ gộp nhiều dòng thành một tin (5.572 thay vì 5.574 dòng) và bỏ dấu `"` ở
+    đầu/cuối của khoảng 50 tin khác.
+    """
+    return pd.read_csv(f, sep="\t", header=None, names=["label", "text"], quoting=csv.QUOTE_NONE,
+                       encoding="utf-8", dtype=str, keep_default_na=False)
+
+
 def download_uci_dataset() -> pd.DataFrame:
     """Tải SMS Spam Collection (UCI). File gốc là TSV: label \\t text."""
     resp = requests.get(UCI_URL, timeout=30)
     resp.raise_for_status()
     with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
         with zf.open("SMSSpamCollection") as f:
-            df = pd.read_csv(f, sep="\t", header=None, names=["label", "text"])
+            df = parse_uci_tsv(f)
     DATA_DIR.mkdir(exist_ok=True)
     df.to_csv(DATA_DIR / "sms_spam.csv", index=False)
     return df

@@ -2,6 +2,7 @@
 
 Chạy: pytest
 """
+import io
 import json
 import sys
 from pathlib import Path
@@ -16,7 +17,7 @@ from predict import evaluate_labels, explain_email  # noqa: E402
 from preprocess import group_key  # noqa: E402
 from signals import detect_signals, is_shortener  # noqa: E402
 from storage import log_feedback  # noqa: E402
-from train import merge_feedback, prepare_data, run_training, split_train_test  # noqa: E402
+from train import merge_feedback, parse_uci_tsv, prepare_data, run_training, split_train_test  # noqa: E402
 
 SAMPLE_CSV = Path(__file__).resolve().parent.parent / "data" / "sample_spam.csv"
 
@@ -34,6 +35,19 @@ def _toy_df(n_groups: int = 30) -> pd.DataFrame:
 
 
 # ----------------------------------------------------------------- 1. rò rỉ train/test
+def test_parse_uci_tsv_keeps_unbalanced_quotes_as_text():
+    # File UCI có tin bắt đầu bằng dấu " không đóng: cách đọc mặc định gộp 3 dòng thành 1 tin
+    raw = ('ham\tHello there\n'
+           'ham\t"Keep ur problems in ur heart.. SD..\n'
+           'ham\tYeah, got it\n'
+           'spam\t"WIN a FREE prize"\n'
+           'ham\tNA\n').encode("utf-8")
+    df = parse_uci_tsv(io.BytesIO(raw))
+    assert len(df) == 5
+    assert df["text"].tolist()[1:4] == ['"Keep ur problems in ur heart.. SD..', "Yeah, got it", '"WIN a FREE prize"']
+    assert df["text"].iloc[4] == "NA"  # không bị đổi thành giá trị thiếu
+
+
 def test_prepare_data_drops_whitespace_only_duplicates():
     df = pd.DataFrame({"label": ["ham", "ham", "spam"], "text": ["hello there", "  hello   there ", "win"]})
     assert len(prepare_data(df)) == 2

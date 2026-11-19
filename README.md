@@ -1,5 +1,7 @@
 # 📧 Spam Email Detector
 
+[![Tests](https://github.com/OwenDepTry/email-spam-and-risk-detection-system/actions/workflows/tests.yml/badge.svg)](https://github.com/OwenDepTry/email-spam-and-risk-detection-system/actions/workflows/tests.yml)
+
 Hệ thống phát hiện email/tin nhắn rác (Spam/Ham) bằng Machine Learning: pipeline TF-IDF + đặc trưng thủ công,
 **ensemble Soft Voting** của 3 mô hình, kèm giao diện web Streamlit có giải thích kết quả và vòng lặp phản hồi.
 
@@ -100,22 +102,35 @@ Notebook chia dữ liệu với `split_file=None` nên không đụng tới tậ
 
 ## Kết quả
 
-SMS Spam Collection (UCI), 5.158 mẫu sau khi bỏ trùng (642 spam / 4.516 ham). Chia **theo nhóm**:
-4.126 train / 1.032 test (129 spam), seed 42, 5-fold `StratifiedGroupKFold` trên train,
+SMS Spam Collection (UCI), 5.574 tin gốc, còn 5.160 mẫu sau khi bỏ trùng (642 spam / 4.518 ham). Chia **theo nhóm**:
+4.128 train / 1.032 test (128 spam), seed 42, 5-fold `StratifiedGroupKFold` trên train,
 scikit-learn 1.9.1. Precision / Recall / F1 tính cho lớp spam.
 
 | Model | CV F1 (spam) | Accuracy | Precision | Recall | F1 | FP | FN |
 |-------|-------------|----------|-----------|--------|----|----|----|
-| MultinomialNB ⭐ | 95,26% | 99,03% | 100,00% | 92,25% | 95,97% | 0 | 10 |
-| LogisticRegression | 90,01% | 97,00% | 85,51% | 91,47% | 88,39% | 20 | 11 |
-| LinearSVC (calibrated) | 94,81% | 98,45% | 96,69% | 90,70% | 93,60% | 4 | 12 |
-| Soft Voting | 95,18% | 98,55% | 97,50% | 90,70% | 93,98% | 3 | 12 |
+| MultinomialNB | 94,85% | 98,74% | 98,32% | 91,41% | 94,74% | 2 | 11 |
+| LogisticRegression | 89,60% | 98,16% | 90,37% | 95,31% | 92,78% | 13 | 6 |
+| LinearSVC (calibrated) | 94,41% | 98,93% | 98,35% | 92,97% | 95,58% | 2 | 9 |
+| Soft Voting ⭐ | 94,98% | 99,13% | 98,37% | 94,53% | 96,41% | 2 | 7 |
 
-⭐ được chọn theo CV F1 trên train. NB và Soft Voting chênh nhau rất ít (95,26% so với 95,18%),
+⭐ được chọn theo CV F1 trên train. Trung bình 5 lần chia (seed 0–4):
+
+| Model | CV F1 (spam) | F1 trên test |
+|-------|-------------|--------------|
+| MultinomialNB | 95,08% ± 0,23 | 94,36% ± 0,99 |
+| LinearSVC (calibrated) | 94,46% ± 0,23 | 94,17% ± 1,25 |
+| Soft Voting | 95,10% ± 0,24 | 95,06% ± 1,05 |
+
+NB và Soft Voting ngang nhau theo CV; trên test Soft Voting nhỉnh hơn ~0,7 điểm (tốt hơn ở 4/5 lần chia),
 nên lựa chọn giữa hai mô hình này nằm trong mức nhiễu.
 
+> Trước 19/11/2026, `train.py` đọc file UCI với xử lý dấu ngoặc kép mặc định của pandas: 3 tin bị gộp thành 1
+> (5.572 thay vì 5.574 dòng) và khoảng 50 tin bị bỏ dấu `"` ở đầu/cuối. Các con số trên đã tính lại với cách đọc đúng
+> (dữ liệu đổi nên tập test cũng được chia lại). Nếu máy bạn còn `data/sms_spam.csv` cũ, hãy xóa file đó để tải lại.
+
 **Về cách chia dữ liệu.** Phiên bản trước chia ngẫu nhiên sau khi chỉ bỏ trùng theo chuỗi gốc,
-nên 33/1.034 tin trong test trùng với tin trong train sau làm sạch. Kiểm tra trên 5 seed (F1 spam trên test):
+nên 33/1.034 tin trong test trùng với tin trong train sau làm sạch. Kiểm tra trên 5 seed (F1 spam trên test,
+tính trên dữ liệu đọc theo cách cũ, 5.158 mẫu):
 
 | Cách chia | MultinomialNB | Soft Voting |
 |-----------|---------------|-------------|
