@@ -3,6 +3,7 @@ import json
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -105,3 +106,21 @@ def test_training_can_include_user_feedback(tmp_path):
 def test_clean_text_unescapes_html_entities():
     tokens = clean_text("&lt;#&gt; call me &amp; come").split()
     assert "lt" not in tokens and "gt" not in tokens and "call" in tokens
+
+
+# ----------------------------------------------------------------- trang phân loại hàng loạt
+def test_guess_text_column_prefers_known_names():
+    df = pd.DataFrame({"id": [1, 2], " Message ": ["hi", "win cash"], "note": ["a", "b"]})
+    assert ui.guess_text_column(df) == 1
+
+
+def test_guess_text_column_finds_string_column_with_pandas3_dtype():
+    # pandas 3: cột chữ có kiểu StringDtype chứ không phải object -> trước đây chọn nhầm cột "id"
+    df = pd.DataFrame({"id": [1, 2], "noi_dung": ["hello there", "win cash now"]})
+    assert ui.guess_text_column(df) == 1
+    df_obj = df.astype({"noi_dung": object})
+    assert ui.guess_text_column(df_obj) == 1
+
+
+def test_guess_text_column_falls_back_to_first_column():
+    assert ui.guess_text_column(pd.DataFrame({"a": [1], "b": [2.5]})) == 0

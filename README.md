@@ -42,6 +42,7 @@ spam_detector/
 ├── signals.py          # Phát hiện dấu hiệu đáng ngờ theo luật
 ├── preprocess.py       # clean_text, đặc trưng thủ công
 ├── storage.py          # Ghi/đọc feedback (CSV; dễ thay bằng database)
+├── notebooks/          # Jupyter: khám phá dữ liệu & thử nghiệm (import từ các file .py)
 ├── tests/              # pytest
 ├── .streamlit/config.toml
 ├── data/sample_spam.csv   # 40 mẫu để demo/test; dữ liệu thật tự tải khi train
@@ -81,6 +82,21 @@ Chạy test:
 pip install -r requirements-dev.txt
 pytest
 ```
+
+## Notebook (thử nghiệm)
+
+Code chính nằm trong các file `.py`. Notebook trong `notebooks/` chỉ **import** từ đó để khám phá dữ liệu,
+thử tham số và soi các tin bị đoán sai; ý tưởng nào tốt thì mới chuyển vào `.py` và thêm test.
+
+```bash
+pip install -r requirements-dev.txt
+nbstripout --install      # chạy 1 lần sau khi clone: tự xóa output notebook khi commit (diff gọn)
+jupyter lab notebooks/01_eda_and_experiments.ipynb   # hoặc mở bằng VS Code (extension Jupyter)
+```
+
+`notebooks/01_eda_and_experiments.ipynb`: phân bố độ dài và đặc trưng thủ công theo nhãn, ví dụ `clean_text`,
+thử `min_df` của TF-IDF bằng cross-validation, phân tích lỗi trên tập test, precision/recall theo ngưỡng.
+Notebook chia dữ liệu với `split_file=None` nên không đụng tới tập test đã khóa trong `models/`.
 
 ## Kết quả
 

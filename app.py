@@ -70,18 +70,14 @@ def clear_history() -> None:
     st.session_state["history"] = []
 
 
+def clear_batch() -> None:
+    """Đổi/bỏ file CSV thì xóa kết quả cũ, tránh hiển thị kết quả của file trước."""
+    st.session_state.pop("batch", None)
+
+
 # ----------------------------------------------------------------------------- helpers
 def html(markup: str) -> None:
     st.markdown(markup, unsafe_allow_html=True)
-
-
-def guess_text_column(df: pd.DataFrame) -> int:
-    cols = [str(c).lower() for c in df.columns]
-    for key in ("text", "message", "email", "body", "content"):
-        if key in cols:
-            return cols.index(key)
-    object_cols = [i for i, c in enumerate(df.columns) if df[c].dtype == object]
-    return object_cols[0] if object_cols else 0
 
 
 # ----------------------------------------------------------------------------- sidebar
@@ -202,7 +198,7 @@ elif page == PAGES[2]:
     st.write("Tải lên file CSV có một cột chứa nội dung email/tin nhắn để phân loại cả file cùng lúc.")
     if SAMPLE_CSV.exists():
         st.download_button("⬇️ Tải file CSV mẫu để thử", SAMPLE_CSV.read_bytes(), "sample_spam.csv", "text/csv")
-    file = st.file_uploader("File CSV", type=["csv"])
+    file = st.file_uploader("File CSV", type=["csv"], on_change=clear_batch)
 
     if file is not None:
         try:
@@ -211,7 +207,7 @@ elif page == PAGES[2]:
             st.error(f"Không đọc được file CSV: {exc}")
             df = None
         if df is not None and not df.empty:
-            text_col = st.selectbox("Cột nội dung", list(df.columns), index=guess_text_column(df))
+            text_col = st.selectbox("Cột nội dung", list(df.columns), index=ui.guess_text_column(df))
             label_col = st.selectbox("Cột nhãn thật (tùy chọn, để đánh giá)", ["(không có)"] + list(df.columns))
             st.caption("Xem trước 5 dòng đầu:")
             st.dataframe(df.head(5))

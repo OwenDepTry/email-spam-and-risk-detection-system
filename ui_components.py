@@ -7,6 +7,8 @@ Màu nền dùng rgba trung tính + màu chữ kế thừa nên hiển thị t�
 import html
 import re
 
+from pandas.api.types import is_object_dtype, is_string_dtype
+
 SPAM_COLOR = "#ef4444"
 HAM_COLOR = "#22c55e"
 ACCENT = "#6366f1"
@@ -66,6 +68,23 @@ _CSS = """
 .sd-hl span.sd-na{color:#94a3b8;text-decoration:underline dotted}
 .sd-note{font-size:.85rem;opacity:.7}
 """
+
+
+TEXT_COLUMN_NAMES = ("text", "message", "email", "body", "content")
+
+
+def guess_text_column(df) -> int:
+    """Vị trí cột có khả năng chứa nội dung email trong DataFrame (để chọn sẵn trên trang hàng loạt).
+
+    Ưu tiên tên cột quen thuộc; nếu không có thì lấy cột chữ đầu tiên. Từ pandas 3, cột chữ có kiểu
+    StringDtype (không còn là object), nên phải kiểm tra cả hai kiểu.
+    """
+    cols = [str(c).strip().lower() for c in df.columns]
+    for key in TEXT_COLUMN_NAMES:
+        if key in cols:
+            return cols.index(key)
+    text_cols = [i for i, c in enumerate(df.columns) if is_string_dtype(df[c]) or is_object_dtype(df[c])]
+    return text_cols[0] if text_cols else 0
 
 
 def _e(value) -> str:
