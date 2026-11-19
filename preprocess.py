@@ -6,6 +6,7 @@ có thể lưu bằng joblib và nạp lại an toàn.
 import hashlib
 import html
 import re
+import unicodedata
 
 import numpy as np
 
@@ -54,6 +55,24 @@ def clean_text(text: str) -> str:
     text = NON_ALPHA_RE.sub(" ", text)
     tokens = [t for t in MULTI_SPACE_RE.sub(" ", text).split() if t not in STOPWORDS and len(t) > 1]
     return " ".join(tokens)
+
+
+def strip_accents(text) -> str:
+    """Bỏ dấu tiếng Việt + chữ thường, GIỮ NGUYÊN số ký tự: 'Xác Minh Đăng nhập' -> 'xac minh dang nhap'.
+
+    Giữ nguyên độ dài để vị trí tìm thấy trong chuỗi không dấu dùng được để cắt lại chuỗi gốc (sau khi
+    chuẩn hóa NFC). Dùng để so khớp từ khóa cả khi kẻ gian viết không dấu.
+    """
+    if not isinstance(text, str):
+        return ""
+    out = []
+    for ch in unicodedata.normalize("NFC", text):
+        if ch in "đĐ":
+            out.append("d")
+            continue
+        base = unicodedata.normalize("NFD", ch)[0].lower()
+        out.append(base[0] if base else ch)
+    return "".join(out)
 
 
 def normalize_whitespace(text) -> str:

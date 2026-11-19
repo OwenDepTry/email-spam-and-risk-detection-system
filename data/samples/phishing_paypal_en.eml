@@ -1,0 +1,39 @@
+Authentication-Results: mx.example.net; spf=pass
+ smtp.mailfrom=paypa1-security.test; dkim=fail; dmarc=fail
+From: "PayPal Service" <service@paypa1-security.test>
+To: customer@example.com
+Subject: Your account has been limited
+Date: Tue, 17 Nov 2026 22:40:00 +0000
+Message-ID: <sample-phish-02@paypa1-security.test>
+Content-Type: multipart/mixed; boundary="===============2463191666778673852=="
+
+--===============2463191666778673852==
+Content-Type: multipart/alternative;
+ boundary="===============6702802288979938165=="
+
+--===============6702802288979938165==
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+<html><body>
+<p>Dear Customer,</p>
+<p>We noticed unusual activity in your account. Your access has been limited.=
+</p>
+<p>Please <a href=3D"https://paypa1-security.test/signin">https://www.paypal.=
+com/signin</a> to verify your identity
+within 24 hours, or your account will be suspended.</p>
+<p>See the attached invoice for details.</p>
+</body></html>
+
+--===============6702802288979938165==--
+
+--===============2463191666778673852==
+Content-Type: application/octet-stream
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="Invoice_2026.pdf.exe"
+MIME-Version: 1.0
+
+TVogc2FtcGxl
+
+--===============2463191666778673852==--

@@ -9,6 +9,8 @@ import streamlit as st
 import ui_components as ui
 from predict import (DEFAULT_THRESHOLD, evaluate_labels, explain_email, load_metrics, predict_all_models,
                      predict_batch, predict_email)
+from email_parser import looks_like_raw_email, parse_eml
+from email_risk import assess_risk, attachment_issue, detect_email_signals, link_issues, merge_signals
 from signals import detect_signals
 from storage import log_feedback, read_feedback
 
@@ -25,6 +27,9 @@ MODELS = metrics["models"]
 BEST = metrics["best"]
 DS = metrics["dataset"]
 SAMPLE_CSV = Path(__file__).parent / "data" / "sample_spam.csv"
+SAMPLE_EMLS = {p.name: p for p in sorted((Path(__file__).parent / "data" / "samples").glob("*.eml"))}
+INPUT_MODES = ["✍️ Dán nội dung", "📎 Tải file .eml", "🧪 Email mẫu"]
+RISK_LABELS = {"high": "Cao", "medium": "Thận trọng", "low": "Thấp"}
 PAGES = ["🏠 Tổng quan", "🔍 Kiểm tra email", "📂 Phân loại hàng loạt", "📊 Hiệu năng mô hình", "🗂️ Phản hồi & lịch sử"]
 EXAMPLES = {
     "— Chọn ví dụ (hoặc để trống) —": ("", ""),
@@ -105,15 +110,16 @@ history = st.session_state["history"]
 # ============================================================================= 1. TỔNG QUAN
 if page == PAGES[0]:
     html(ui.hero("Spam Email Detector",
-                 "Phát hiện email và tin nhắn rác bằng Machine Learning: nhiều mô hình cùng bỏ phiếu, "
-                 "kèm giải thích từng từ và các dấu hiệu đáng ngờ.",
-                 ["Soft Voting ensemble", "TF-IDF + đặc trưng thủ công", "Giải thích kết quả"]))
+                 "Kiểm tra email đáng ngờ: phát hiện giả danh thương hiệu, tên miền nhái, link lệch địa chỉ, "
+                 "file đính kèm nguy hiểm, kèm mô hình Machine Learning phân loại spam có giải thích.",
+                 ["Đọc file .eml", "Dấu hiệu lừa đảo tiếng Việt + Anh", "Soft Voting ensemble"]))
     st.button("🔍 Thử ngay", type="primary", on_click=go_to, args=(PAGES[1],))
 
     st.subheader("Số liệu nhanh")
     html(ui.kpi_list([
         ("Đã kiểm tra trong phiên này", len(history)),
-        ("Trong đó phát hiện spam", sum(1 for h in history if h["Kết quả"] == "Spam")),
+        ("Trong đó rủi ro cao", sum(1 for h in history if h.get("Rủi ro") == RISK_LABELS["high"])),
+        ("Mô hình ML cho là spam", sum(1 for h in history if h["Kết quả"] == "Spam")),
         ("Phản hồi người dùng đã gửi", len(read_feedback())),
         (f"F1 spam của mô hình tốt nhất ({MODELS[BEST]['label']})", f"{MODELS[BEST]['f1']:.3f}"),
         ("Số mẫu huấn luyện", f"{DS['n_samples']:,}"),
@@ -121,37 +127,76 @@ if page == PAGES[0]:
 
     st.subheader("Cách hoạt động")
     html(ui.card("Từ email đến kết luận", ui.step_list([
-        ("Nhập tiêu đề và nội dung", "Dán email hoặc tin nhắn tiếng Anh vào trang Kiểm tra email."),
+        ("Đưa email vào", "Dán nội dung, dán nguồn email hoặc tải file .eml ở trang Kiểm tra email."),
+        ("Kiểm tra dấu hiệu", "Người gửi giả danh, tên miền nhái, SPF/DKIM/DMARC, link lệch địa chỉ, file đính kèm "
+                              "nguy hiểm, từ khóa lừa đảo tiếng Việt và tiếng Anh."),
         ("Làm sạch và trích đặc trưng", "Chuẩn hóa văn bản, TF-IDF (1-2 từ) cùng số link, chữ HOA, dấu !, ký hiệu tiền..."),
         ("Nhiều mô hình bỏ phiếu", "Naive Bayes, Logistic Regression và SVM cho xác suất, Soft Voting lấy trung bình."),
         ("Kết luận kèm giải thích", "Spam hay Ham, điểm spam của mô hình, từ nào ảnh hưởng nhất và các dấu hiệu đáng ngờ."),
     ])))
-    st.caption("Giới hạn: chỉ xử lý nội dung văn bản tiếng Anh, chưa xử lý file đính kèm hay header email.")
+    st.caption("Giới hạn: mô hình ML hiện học từ SMS tiếng Anh; dấu hiệu theo luật không bắt được mọi kiểu lừa đảo; "
+               "file đính kèm chỉ được kiểm tra theo tên, không quét virus.")
 
 # ============================================================================= 2. KIỂM TRA EMAIL
 elif page == PAGES[1]:
     st.header("🔍 Kiểm tra email")
-    st.selectbox("Ví dụ nhanh", list(EXAMPLES), key="example", on_change=load_example)
-    st.text_input("Tiêu đề (tùy chọn)", key="email_subject", placeholder="Ví dụ: You have WON a prize!")
-    st.text_area("Nội dung email / tin nhắn", key="email_body", height=170,
-                 placeholder="Dán nội dung email (tiếng Anh) vào đây...")
+    mode = st.radio("Nguồn email", INPUT_MODES, horizontal=True, key="input_mode", label_visibility="collapsed")
+    eml_file, sample_name = None, None
+    if mode == INPUT_MODES[0]:
+        st.selectbox("Ví dụ nhanh", list(EXAMPLES), key="example", on_change=load_example)
+        st.text_input("Tiêu đề (tùy chọn)", key="email_subject", placeholder="Ví dụ: You have WON a prize!")
+        st.text_area("Nội dung email / tin nhắn", key="email_body", height=170,
+                     placeholder="Dán nội dung email vào đây, hoặc dán cả NGUỒN email để phân tích người gửi và link...")
+        st.caption("Mẹo: dán **nguồn email** (Gmail: ⋮ → *Hiển thị bản gốc*; Outlook: … → *Xem* → *Xem nguồn thư*) "
+                   "để kiểm tra cả người gửi, SPF/DKIM/DMARC và địa chỉ thật của các link.")
+    elif mode == INPUT_MODES[1]:
+        eml_file = st.file_uploader("File .eml", type=["eml"])
+        st.caption("Lấy file .eml: Gmail → mở thư → ⋮ → *Tải thư xuống*. Outlook → mở thư → … → *Lưu dưới dạng* "
+                   "(hoặc kéo thư ra thư mục). File chỉ được đọc trong phiên này, không lưu lại.")
+    else:
+        sample_name = st.selectbox("Email mẫu", list(SAMPLE_EMLS)) if SAMPLE_EMLS else None
+        st.caption("Email mẫu dùng tên miền thử nghiệm (.test / .example), không trỏ đến trang thật.")
 
-    if st.button("Phân loại", type="primary"):
-        full_text = (st.session_state["email_subject"].strip() + "\n" + st.session_state["email_body"].strip()).strip()
-        if not full_text:
-            st.warning("Vui lòng nhập nội dung.")
+    if st.button("Phân tích", type="primary"):
+        parsed, error = None, None
+        try:
+            if mode == INPUT_MODES[1]:
+                if eml_file is None:
+                    error = "Vui lòng chọn file .eml."
+                else:
+                    parsed = parse_eml(eml_file.getvalue())
+            elif mode == INPUT_MODES[2]:
+                if sample_name:
+                    parsed = parse_eml(SAMPLE_EMLS[sample_name].read_bytes())
+                else:
+                    error = "Không tìm thấy email mẫu trong data/samples/."
+            elif looks_like_raw_email(st.session_state["email_body"]):
+                parsed = parse_eml(st.session_state["email_body"])
+        except ValueError as exc:
+            error = str(exc)
+
+        full_text = parsed.model_text() if parsed else (
+            st.session_state["email_subject"].strip() + "\n" + st.session_state["email_body"].strip()).strip()
+        if error:
+            st.warning(error)
+        elif not full_text:
+            st.warning("Vui lòng nhập nội dung (email không có nội dung văn bản để phân tích).")
         else:
             start = time.perf_counter()
             result = predict_email(full_text, model_name, threshold)
             tokens = explain_email(full_text, model_name)
             consensus = predict_all_models(full_text, threshold)
-            signals = detect_signals(full_text)
+            signals = merge_signals(detect_signals(full_text), detect_email_signals(parsed))
+            risk = assess_risk(signals)
             elapsed = time.perf_counter() - start
             st.session_state["last"] = {"text": full_text, "result": result, "tokens": tokens, "signals": signals,
-                                        "consensus": consensus, "elapsed": elapsed, "feedback": None}
+                                        "risk": risk, "email": parsed, "consensus": consensus, "elapsed": elapsed,
+                                        "feedback": None}
+            preview = (f"{parsed.from_addr} · {parsed.subject}" if parsed else full_text).replace("\n", " ")
             history.insert(0, {
                 "Thời gian": datetime.now().strftime("%H:%M:%S"),
-                "Nội dung": full_text.replace("\n", " ")[:70] + ("…" if len(full_text) > 70 else ""),
+                "Nội dung": preview[:70] + ("…" if len(preview) > 70 else ""),
+                "Rủi ro": RISK_LABELS[risk["level"]],
                 "Kết quả": result["label"],
                 "Xác suất spam (%)": result["spam_probability"],
                 "Mô hình": MODELS[model_name]["label"],
@@ -161,11 +206,24 @@ elif page == PAGES[1]:
     if last:
         res = last["result"]
         if res["model"] != model_name or abs(res["threshold"] - threshold) > 1e-9:
-            st.info("Bạn vừa đổi mô hình hoặc ngưỡng ở thanh bên. Bấm **Phân loại** để cập nhật kết quả.")
+            st.info("Bạn vừa đổi mô hình hoặc ngưỡng ở thanh bên. Bấm **Phân tích** để cập nhật kết quả.")
 
+        # 1) Rủi ro theo dấu hiệu (người gửi, xác thực, link, file đính kèm, từ khóa) - phần chính
+        html(ui.risk_card(last.get("risk") or assess_risk(last["signals"])))
+        parsed = last.get("email")
+        if parsed:
+            html(ui.email_header_card(parsed))
+        html(ui.signals_html(last["signals"]))
+        if parsed:
+            html(ui.links_html(parsed.links, link_issues))
+            html(ui.attachments_html(parsed.attachments, attachment_issue))
+
+        # 2) Mô hình ML - tham khảo
+        st.subheader("Đánh giá của mô hình ML")
+        st.caption("Mô hình hiện được huấn luyện trên tin nhắn SMS tiếng Anh, nên với email (nhất là tiếng Việt) "
+                   "kết quả này chỉ mang tính tham khảo. Mức rủi ro phía trên dựa trên dấu hiệu cụ thể.")
         html(ui.verdict_card(res["label"], res["confidence"], MODELS[res["model"]]["label"], last["elapsed"] * 1000))
         html(ui.gauge(res["spam_probability"], res["threshold"]))
-        html(ui.signals_html(last["signals"]))
 
         votes = sum(1 for r in last["consensus"] if r["label"] == "Spam")
         html(ui.card(
@@ -175,19 +233,19 @@ elif page == PAGES[1]:
             + '<div class="sd-note">Độ dài thanh = xác suất spam. Đỏ: kết luận Spam, xanh: kết luận Ham.</div>',
         ))
 
-        st.subheader("Vì sao có kết quả này?")
-        html(ui.highlight_html(last["tokens"]))
-        st.caption("🟥 từ đẩy về phía spam · 🟩 từ đẩy về phía ham · rê chuột lên từ để xem mức ảnh hưởng")
-        n_skipped = sum(1 for t in last["tokens"] if t["impact"] is None)
-        if n_skipped:
-            st.caption(f"⚪ {n_skipped} từ cuối (gạch chân chấm) **chưa được phân tích** để giữ tốc độ, "
-                       "không có nghĩa là chúng không ảnh hưởng đến kết quả.")
+        with st.expander("Vì sao mô hình ML cho kết quả này?"):
+            html(ui.highlight_html(last["tokens"]))
+            st.caption("🟥 từ đẩy về phía spam · 🟩 từ đẩy về phía ham · rê chuột lên từ để xem mức ảnh hưởng")
+            n_skipped = sum(1 for t in last["tokens"] if t["impact"] is None)
+            if n_skipped:
+                st.caption(f"⚪ {n_skipped} từ cuối (gạch chân chấm) **chưa được phân tích** để giữ tốc độ, "
+                           "không có nghĩa là chúng không ảnh hưởng đến kết quả.")
 
         st.divider()
         if last["feedback"]:
             st.success(f"Cảm ơn! Đã ghi nhận nhãn đúng là **{last['feedback']}** vào logs/feedback.csv")
         else:
-            st.write("Kết quả này có đúng không?")
+            st.write("Kết luận Spam/Ham của mô hình có đúng không?")
             c1, c2, _ = st.columns([1, 1, 4])
             c1.button("👍 Đúng", on_click=send_feedback, args=(True,))
             c2.button("👎 Sai", on_click=send_feedback, args=(False,))

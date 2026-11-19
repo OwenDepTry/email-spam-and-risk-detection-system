@@ -1,0 +1,56 @@
+Authentication-Results: mx.example.net; spf=softfail
+ smtp.mailfrom=vietcombamk.test; dkim=none; dmarc=fail (p=QUARANTINE)
+ header.from=vietcombamk.test
+Received-SPF: softfail (domain of vietcombamk.test does not designate
+ 198.51.100.7 as permitted sender)
+From: Vietcombank - =?utf-8?b?VGjDtG5nIGLDoW8gYuG6o28gbeG6rXQ=?=
+ <canhbao@vietcombamk.test>
+Reply-To: hotro.vcb.2026@gmail.com
+To: khachhang@example.com
+Subject: =?utf-8?b?W0tI4bqoTl0gVMOgaSBraG/huqNuIGPhu6dhIFF1w70ga2jDoWNoIHM=?=
+ =?utf-8?b?4bq9IGLhu4sgdOG6oW0ga2jDs2E=?= trong 24h
+Date: Thu, 19 Nov 2026 08:15:00 +0700
+Message-ID: <mau-lua-dao-01@vietcombamk.test>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============5871346773509619063=="
+
+--===============5871346773509619063==
+Content-Type: multipart/alternative;
+ boundary="===============4125253416522574691=="
+
+--===============4125253416522574691==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+
+S8OtbmggZ+G7rWkgUXXDvSBraMOhY2gsCgpI4buHIHRo4buRbmcgcGjDoXQgaGnhu4duIGhv4bqh
+dCDEkeG7mW5nIGLhuqV0IHRoxrDhu51uZyB0csOqbiB0w6BpIGtob+G6o24gY+G7p2EgUXXDvSBr
+aMOhY2guCsSQ4buDIHRyw6FuaCBi4buLIHThuqFtIGtow7NhLCB2dWkgbMOybmcgeMOhYyBtaW5o
+IHRow7RuZyB0aW4gdsOgIG3DoyBPVFAgdHJvbmcgdsOybmcgMjRoIHThuqFpOgpodHRwczovL3Zp
+ZXRjb21iYW5rLmNvbS52bi94YWMtdGh1YwoKVHLDom4gdHLhu41uZywKTmfDom4gaMOgbmcgVE1D
+UCBOZ2/huqFpIHRoxrDGoW5nIFZp4buHdCBOYW0K
+
+--===============4125253416522574691==
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: base64
+MIME-Version: 1.0
+
+PGh0bWw+PGJvZHk+CjxwPkvDrW5oIGfhu61pIFF1w70ga2jDoWNoLDwvcD4KPHA+SOG7hyB0aOG7
+kW5nIHBow6F0IGhp4buHbiA8Yj5ob+G6oXQgxJHhu5luZyBi4bqldCB0aMaw4budbmc8L2I+IHRy
+w6puIHTDoGkga2hv4bqjbiBj4bunYSBRdcO9IGtow6FjaC48L3A+CjxwPsSQ4buDIHRyw6FuaCBi
+4buLIHThuqFtIGtow7NhLCB2dWkgbMOybmcgPGI+eMOhYyBtaW5oIHRow7RuZyB0aW4gdsOgIG3D
+oyBPVFA8L2I+IHRyb25nIHbDsm5nIDI0aCB04bqhaTo8YnI+CjxhIGhyZWY9Imh0dHBzOi8vdmll
+dGNvbWJhbmsteGFjdGh1Yy50ZXN0L2RhbmctbmhhcD9pZD04ODEyIj5odHRwczovL3ZpZXRjb21i
+YW5rLmNvbS52bi94YWMtdGh1YzwvYT48L3A+CjxwPlRyw6JuIHRy4buNbmcsPGJyPk5nw6JuIGjD
+oG5nIFRNQ1AgTmdv4bqhaSB0aMawxqFuZyBWaeG7h3QgTmFtPC9wPgo8L2JvZHk+PC9odG1sPgo=
+
+--===============4125253416522574691==--
+
+--===============5871346773509619063==
+Content-Type: text/html
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="Bien_ban_khoa_tai_khoan.html"
+MIME-Version: 1.0
+
+PGh0bWw+PGJvZHk+VHJhbmcgZGFuZyBuaGFwIGdpYSAobWF1KTwvYm9keT48L2h0bWw+
+
+--===============5871346773509619063==--

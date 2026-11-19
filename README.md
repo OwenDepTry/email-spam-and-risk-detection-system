@@ -2,12 +2,29 @@
 
 [![Tests](https://github.com/OwenDepTry/email-spam-and-risk-detection-system/actions/workflows/tests.yml/badge.svg)](https://github.com/OwenDepTry/email-spam-and-risk-detection-system/actions/workflows/tests.yml)
 
-Hệ thống phát hiện email/tin nhắn rác (Spam/Ham) bằng Machine Learning: pipeline TF-IDF + đặc trưng thủ công,
-**ensemble Soft Voting** của 3 mô hình, kèm giao diện web Streamlit có giải thích kết quả và vòng lặp phản hồi.
+Công cụ kiểm tra email đáng ngờ, tập trung vào **lừa đảo (phishing)**, hỗ trợ tiếng Việt và tiếng Anh:
+dán nội dung / nguồn email hoặc tải file `.eml`, hệ thống cho biết **mức rủi ro và lý do cụ thể**
+(giả danh thương hiệu, tên miền nhái, SPF/DKIM/DMARC, link lệch địa chỉ, file đính kèm nguy hiểm...).
+Kèm mô hình Machine Learning phân loại spam (TF-IDF + **ensemble Soft Voting** của 3 mô hình) có giải thích kết quả
+và vòng lặp phản hồi.
 
 <!-- Thêm ảnh chụp màn hình giao diện vào đây, ví dụ: ![Demo](docs/demo.png) -->
 
 ## Tính năng
+
+**Kiểm tra email lừa đảo (theo luật, có giải thích)** — `email_parser.py`, `email_risk.py`
+- **Đọc email thật**: file `.eml` hoặc nguồn email dán vào (tự nhận ra); tách người gửi, Reply-To, tiêu đề,
+  nội dung (HTML → văn bản), link (chữ hiển thị + địa chỉ thật) và file đính kèm. Chỉ dùng thư viện chuẩn.
+- **Người gửi**: tên hiển thị giả danh thương hiệu (ngân hàng, ví điện tử, sàn TMĐT, Tổng cục Thuế, PayPal,
+  Microsoft...) nhưng gửi từ tên miền khác / Gmail; tên miền nhái (`vietcombamk`, `paypa1`, `rnicrosoft`,
+  ký tự Cyrillic/punycode); Reply-To trỏ đi nơi khác.
+- **Xác thực**: đọc SPF / DKIM / DMARC từ header `Authentication-Results` do máy chủ nhận ghi (bỏ qua header giả chèn bên dưới).
+- **Link**: chữ hiển thị là một địa chỉ nhưng mở ra địa chỉ khác, link đến tên miền nhái, link thẳng địa chỉ IP, link rút gọn.
+- **File đính kèm**: đuôi kép (`hoa_don.pdf.exe`), file chạy được, file `.html` (trang đăng nhập giả), Office có macro, file nén.
+- **Từ khóa tiếng Việt + tiếng Anh**: khẩn cấp, trúng thưởng, xác minh / OTP / mật khẩu... (bắt cả khi viết không dấu).
+- **Mức rủi ro tổng hợp** (Cao / Thận trọng / Thấp) kèm danh sách lý do; 3 email mẫu trong `data/samples/`.
+- Tránh báo nhầm: không so độ giống với tên ngắn (abbank/mbbank, lpbank/tpbank là ngân hàng thật khác nhau),
+  không coi "tài khoản"/"ngân hàng" + link là lừa đảo (thông báo số dư thật vẫn ở mức thấp).
 
 **Mô hình**
 - **Ensemble**: MultinomialNB + Logistic Regression + LinearSVC (calibrated) gộp bằng Soft Voting, so sánh với từng mô hình đơn lẻ.
@@ -17,7 +34,9 @@ Hệ thống phát hiện email/tin nhắn rác (Spam/Ham) bằng Machine Learni
 
 **Giao diện (5 trang, menu dọc ở thanh bên)**
 - **Tổng quan**: số liệu nhanh của phiên làm việc, cách hệ thống hoạt động.
-- **Kiểm tra email**: nhập tiêu đề + nội dung, thẻ kết luận, thanh đo xác suất kèm ngưỡng, **dấu hiệu đáng ngờ theo luật** (link rút gọn, từ khẩn cấp, nhắc đến tiền thưởng, nghi lừa đảo tài khoản...), **đồng thuận giữa các mô hình**, tô màu từng từ đẩy về spam/ham.
+- **Kiểm tra email**: dán nội dung, dán nguồn email, tải file `.eml` hoặc chọn email mẫu → thẻ **mức rủi ro**,
+  thông tin người gửi + SPF/DKIM/DMARC, danh sách dấu hiệu, bảng link (chữ hiển thị ↔ trang thật sự mở),
+  file đính kèm; bên dưới là kết luận của mô hình ML, thanh đo xác suất, **đồng thuận giữa các mô hình**, tô màu từng từ.
 - **Phân loại hàng loạt**: tải CSV (có file mẫu), biểu đồ tỉ lệ spam, 10 dòng đáng ngờ nhất, tự tính accuracy/precision/recall nếu file có nhãn, tải kết quả.
 - **Hiệu năng mô hình**: so sánh F1/Precision/Recall/Accuracy bằng biểu đồ cột ngang, confusion matrix, từ khóa đặc trưng (tách riêng đặc trưng thủ công).
 - **Phản hồi & lịch sử**: lịch sử phiên, thống kê và tải về phản hồi người dùng.
@@ -41,13 +60,16 @@ spam_detector/
 ├── ui_components.py    # Thành phần giao diện HTML/CSS (thuần Python, có test)
 ├── train.py            # Train 4 model, cross-validation, lưu model + metrics.json
 ├── predict.py          # predict_email / predict_batch / predict_all_models / explain_email (+ CLI)
-├── signals.py          # Phát hiện dấu hiệu đáng ngờ theo luật
+├── signals.py          # Dấu hiệu đáng ngờ trong nội dung chữ (tiếng Anh + tiếng Việt)
+├── email_parser.py     # Đọc file .eml / nguồn email: header, HTML → văn bản, link, file đính kèm
+├── email_risk.py       # Dấu hiệu từ cấu trúc email (người gửi, xác thực, link, đính kèm) + mức rủi ro
 ├── preprocess.py       # clean_text, đặc trưng thủ công
 ├── storage.py          # Ghi/đọc feedback (CSV; dễ thay bằng database)
 ├── notebooks/          # Jupyter: khám phá dữ liệu & thử nghiệm (import từ các file .py)
 ├── tests/              # pytest
 ├── .streamlit/config.toml
 ├── data/sample_spam.csv   # 40 mẫu để demo/test; dữ liệu thật tự tải khi train
+├── data/samples/*.eml     # 3 email mẫu (lừa đảo VI, lừa đảo EN, hợp lệ) - chỉ dùng tên miền .test/.example
 ├── models/             # (tự sinh) *.joblib + metrics.json
 └── logs/               # (tự sinh) feedback.csv
 ```
@@ -70,6 +92,7 @@ Dùng dòng lệnh:
 ```bash
 python predict.py "WINNER!! Claim your free prize at http://bit.ly/win" --explain
 python predict.py --model nb "Hi, can we move the meeting to 3pm?"
+python email_risk.py data/samples/*.eml   # kiểm tra dấu hiệu lừa đảo của file .eml (không cần train)
 ```
 
 Dùng dữ liệu riêng: `python train.py --data my_data.csv` (CSV có cột `label` = spam/ham và `text`).
@@ -144,16 +167,28 @@ Kết quả theo một seed có thể dao động hơn 1 điểm, nên khi so s�
 
 ## Giới hạn
 
-- Chỉ phân loại **nội dung văn bản tiếng Anh**; chưa xử lý file đính kèm, HTML phức tạp, header email (SPF/DKIM).
-- Dataset là tin nhắn SMS; với email dài, chất lượng nên được kiểm tra lại bằng dữ liệu email (ví dụ Enron Spam).
-- "Dấu hiệu đáng ngờ" là luật đơn giản, chỉ mang tính tham khảo, không ảnh hưởng đến kết luận của mô hình.
+- **Mô hình ML hiện học từ SMS tiếng Anh** (bước làm sạch còn bỏ chữ có dấu), nên với email — nhất là tiếng Việt —
+  kết luận Spam/Ham của mô hình chỉ để tham khảo (ví dụ email lịch thi hợp lệ trong `data/samples/` bị chấm ~98% spam).
+  Mức rủi ro trên giao diện dựa trên dấu hiệu theo luật, độc lập với mô hình.
+- Dấu hiệu theo luật không bắt được mọi kiểu lừa đảo (ví dụ email từ tài khoản thật bị chiếm quyền, nội dung "sạch").
+  Danh sách thương hiệu / tên miền chính thức trong `email_risk.BRANDS` cần được bổ sung dần; ngưỡng mức rủi ro
+  chưa được hiệu chỉnh bằng dữ liệu thật.
+- SPF/DKIM/DMARC chỉ có khi tải file `.eml` / dán nguồn email; file đính kèm chỉ được kiểm tra theo tên, không quét virus.
+- Nội dung email chỉ được lưu khi người dùng bấm 👍/👎 (vào `logs/feedback.csv`); trang phản hồi chưa có đăng nhập.
 
 ## Lộ trình phát triển
 
-- [x] Ensemble nhiều mô hình + chọn theo F1 bằng cross-validation
-- [x] UI nhiều trang, giải thích kết quả, phân loại hàng loạt, vòng lặp phản hồi
-- [ ] REST API với FastAPI (`POST /predict`, `POST /predict/batch`), UI gọi qua API
-- [ ] Dockerfile + GitHub Actions (chạy pytest)
-- [ ] Duyệt feedback trước khi đưa vào train; phân quyền xem trang phản hồi (hiện ai cũng xem/tải được toàn bộ)
-- [ ] Lưu log/feedback vào SQL database (SQLite → PostgreSQL), retrain định kỳ từ feedback
-- [ ] Thử mô hình BERT (DistilBERT) để so sánh với ensemble hiện tại
+**Giai đoạn 1 — phân tích rủi ro không cần ML**
+- [x] Đọc `.eml` / nguồn email; dấu hiệu người gửi, xác thực, link, file đính kèm; từ khóa tiếng Việt; mức rủi ro
+- [ ] Bổ sung danh sách thương hiệu & tên miền chính thức từ email thật; thêm email mẫu
+
+**Giai đoạn 2 — mô hình hiểu tiếng Việt và email**
+- [ ] Làm sạch giữ chữ có dấu, TF-IDF theo cụm ký tự (character n-gram)
+- [ ] Dữ liệu: email spam/phishing tiếng Anh công khai + email tiếng Việt thu thập dần (qua 👍/👎); đánh giá trên email thật
+- [ ] Thử mô hình ngôn ngữ đa ngữ / PhoBERT khi đủ dữ liệu
+
+**Giai đoạn 3 — chạy thật**
+- [x] GitHub Actions (chạy pytest)
+- [ ] REST API với FastAPI (`POST /analyze` nhận `.eml`), Dockerfile
+- [ ] Mặc định không lưu nội dung email; đăng nhập cho trang phản hồi; duyệt feedback trước khi đưa vào train
+- [ ] Lưu log/feedback vào SQL database, theo dõi tỉ lệ báo nhầm sau triển khai

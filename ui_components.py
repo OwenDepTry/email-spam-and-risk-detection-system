@@ -67,6 +67,22 @@ _CSS = """
 .sd-hl span{border-radius:4px;padding:1px 3px}
 .sd-hl span.sd-na{color:#94a3b8;text-decoration:underline dotted}
 .sd-note{font-size:.85rem;opacity:.7}
+.sd-risk{border-radius:16px;padding:18px 22px;margin:4px 0 14px;color:#fff}
+.sd-risk.high{background:linear-gradient(135deg,#b91c1c,#ef4444)}
+.sd-risk.medium{background:linear-gradient(135deg,#b45309,#f59e0b)}
+.sd-risk.low{background:linear-gradient(135deg,#15803d,#22c55e)}
+.sd-risk .k{font-size:.8rem;opacity:.9;letter-spacing:.08em;text-transform:uppercase}
+.sd-risk .w{font-size:1.9rem;font-weight:800;line-height:1.15;margin:2px 0 6px}
+.sd-risk .d{opacity:.95;font-size:.95rem}
+.sd-hdr{display:grid;grid-template-columns:minmax(80px,22%) 1fr;gap:6px 12px;font-size:.93rem}
+.sd-hdr .l{opacity:.7}
+.sd-hdr .v{overflow-wrap:anywhere}
+.sd-pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.78rem;font-weight:700;margin-right:6px;color:#fff}
+.sd-lk{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.2);font-size:.9rem}
+.sd-lk:last-child{border-bottom:none}
+.sd-lk .t,.sd-lk .h{overflow-wrap:anywhere}
+.sd-lk .h{font-family:ui-monospace,monospace;font-size:.85rem}
+.sd-lk .i{grid-column:1/3;font-size:.85rem}
 """
 
 
@@ -85,6 +101,14 @@ def guess_text_column(df) -> int:
             return cols.index(key)
     text_cols = [i for i, c in enumerate(df.columns) if is_string_dtype(df[c]) or is_object_dtype(df[c])]
     return text_cols[0] if text_cols else 0
+
+
+RISK_LEVELS = {
+    "high": ("🚨 RỦI RO CAO", "Có dấu hiệu lừa đảo rõ ràng. Không bấm link, không mở file, không cung cấp thông tin."),
+    "medium": ("⚠️ CẦN THẬN TRỌNG", "Có điểm đáng ngờ. Kiểm tra kỹ người gửi trước khi làm theo yêu cầu."),
+    "low": ("✅ RỦI RO THẤP", "Không thấy dấu hiệu đáng ngờ rõ ràng (luật không bắt được mọi kiểu lừa đảo)."),
+}
+AUTH_COLORS = {"pass": HAM_COLOR, "fail": SPAM_COLOR, "softfail": "#f59e0b", "permerror": SPAM_COLOR}
 
 
 def _e(value) -> str:
@@ -235,3 +259,79 @@ def highlight_html(tokens: list[dict]) -> str:
         tip = _e(f"{impact * 100:+.1f} điểm % xác suất spam")
         parts.append(f'<span title="{tip}" style="background:rgba({color},{alpha:.2f})">{safe}</span>')
     return f'<div class="sd-hl">{" ".join(parts)}</div>'
+
+
+def risk_card(risk: dict) -> str:
+    """Thẻ kết luận mức rủi ro theo luật (email_risk.assess_risk)."""
+    level = risk.get("level", "low")
+    title, advice = RISK_LEVELS.get(level, RISK_LEVELS["low"])
+    n, n_high = int(risk.get("n_signals", 0)), int(risk.get("n_high", 0))
+    detail = f"{advice} · {n} dấu hiệu" + (f" ({n_high} nghiêm trọng)" if n_high else "")
+    return (f'<div class="sd-risk {_e(level)}"><div class="k">Mức rủi ro (theo dấu hiệu)</div>'
+            f'<div class="w">{_e(title)}</div><div class="d">{_e(detail)}</div></div>')
+
+
+def _auth_pills(auth: dict) -> str:
+    if not auth:
+        return '<span class="sd-note">Không có thông tin (chỉ có khi tải file .eml hoặc dán nguồn email)</span>'
+    pills = []
+    for key in ("spf", "dkim", "dmarc"):
+        value = auth.get(key, "không có")
+        color = AUTH_COLORS.get(value, "#94a3b8")
+        pills.append(f'<span class="sd-pill" style="background:{color}">{key.upper()}: {_e(value)}</span>')
+    return "".join(pills)
+
+
+def email_header_card(pe) -> str:
+    """Thông tin người gửi + kết quả xác thực của email đã đọc (email_parser.ParsedEmail)."""
+    sender = f"{pe.from_name} <{pe.from_addr}>" if pe.from_name else (pe.from_addr or "—")
+    rows = [("Người gửi", _e(sender)), ("Tiêu đề", _e(pe.subject or "—"))]
+    if pe.reply_to and pe.reply_to.lower() != (pe.from_addr or "").lower():
+        rows.append(("Trả lời tới", _e(pe.reply_to)))
+    if pe.date:
+        rows.append(("Ngày gửi", _e(pe.date)))
+    rows.append(("Xác thực", _auth_pills(pe.auth)))
+    body = "".join(f'<div class="l">{label}</div><div class="v">{value}</div>' for label, value in rows)
+    return f'<div class="sd-card"><div class="h">Thông tin email</div><div class="sd-hdr">{body}</div></div>'
+
+
+def links_html(links, issues_of, limit: int = 15) -> str:
+    """Bảng link: chữ hiển thị | nơi link thật sự mở ra, kèm cảnh báo. issues_of(link) -> [(id, mức, mô tả)]."""
+    if not links:
+        return ""
+    rows = []
+    for lk in links[:limit]:
+        issues = issues_of(lk)
+        if issues:
+            worst = min(issues, key=lambda i: {"high": 0, "medium": 1, "low": 2}[i[1]])[1]
+            note = (f'<div class="i" style="color:{SEVERITY_COLORS[worst]}">⚠ '
+                    f'{_e("; ".join(i[2] for i in issues))}</div>')
+        else:
+            note = ""
+        shown = lk.text or "(ảnh / không có chữ)"
+        rows.append(f'<div class="sd-lk"><div class="t">{_e(shown[:120])}</div>'
+                    f'<div class="h">→ {_e(lk.host or lk.href[:80])}</div>{note}</div>')
+    more = (f'<div class="sd-note" style="margin-top:6px">… và {len(links) - limit} link khác</div>'
+            if len(links) > limit else "")
+    n_bad = sum(1 for lk in links if issues_of(lk))
+    title = f"Link trong email ({len(links)}" + (f", {n_bad} đáng ngờ)" if n_bad else ")")
+    return (f'<div class="sd-card"><div class="h">{_e(title)}</div>'
+            f'<div class="sd-note" style="margin-bottom:4px">Trái: chữ bạn nhìn thấy · Phải: trang thật sự mở ra</div>'
+            f'{"".join(rows)}{more}</div>')
+
+
+def attachments_html(attachments, issue_of) -> str:
+    """Danh sách file đính kèm. issue_of(att) -> (id, mức, tiêu đề, mô tả) hoặc None."""
+    if not attachments:
+        return ""
+    rows = []
+    for att in attachments:
+        issue = issue_of(att)
+        color = SEVERITY_COLORS[issue[1]] if issue else HAM_COLOR
+        label = issue[2] if issue else "Không thấy dấu hiệu nguy hiểm theo đuôi file"
+        size = f"{att.size / 1024:.1f} KB" if att.size >= 1024 else f"{att.size} B"
+        rows.append(f'<div class="sd-sig"><span class="sd-dot" style="background:{color}"></span><div>'
+                    f'<div class="tt">{_e(att.filename)} <span class="sd-note">· {_e(size)}</span></div>'
+                    f'<div class="dd">{_e(label)}</div></div></div>')
+    return (f'<div class="sd-card"><div class="h">File đính kèm ({len(attachments)})</div>{"".join(rows)}'
+            f'<div class="sd-note" style="margin-top:6px">Chỉ kiểm tra theo tên file, không quét virus.</div></div>')

@@ -1,0 +1,50 @@
+Authentication-Results: mx.example.net; spf=pass
+ smtp.mailfrom=truongdaihoc.example; dkim=pass header.d=truongdaihoc.example;
+ dmarc=pass header.from=truongdaihoc.example
+From: =?utf-8?b?UGjDsm5nIMSQw6BvIHThuqFv?= <phongdaotao@truongdaihoc.example>
+To: sinhvien@truongdaihoc.example
+Subject: =?utf-8?b?VGjDtG5nIGLDoW8gbOG7i2NoIHRoaSBjdeG7kWkga+G7syBo4buNYyBr?=
+ =?utf-8?b?4buz?= 1
+Date: Wed, 18 Nov 2026 14:02:00 +0700
+Message-ID: <lich-thi-hk1@truongdaihoc.example>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============0871312753560920148=="
+
+--===============0871312753560920148==
+Content-Type: multipart/alternative;
+ boundary="===============5602815164584729471=="
+
+--===============5602815164584729471==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+
+Q2jDoG8gY8OhYyBi4bqhbiBzaW5oIHZpw6puLAoKUGjDsm5nIMSQw6BvIHThuqFvIGfhu61pIGzh
+u4tjaCB0aGkgY3Xhu5FpIGvhu7MgaOG7jWMga+G7syAxIChmaWxlIMSRw61uaCBrw6htKS4KQ8Oh
+YyBi4bqhbiB4ZW0gY2hpIHRp4bq/dCBwaMOybmcgdGhpIHThuqFpIGh0dHBzOi8vZGFvdGFvLnRy
+dW9uZ2RhaWhvYy5leGFtcGxlL2xpY2gtdGhpCgpN4buNaSB0aOG6r2MgbeG6r2MgdnVpIGzDsm5n
+IGxpw6puIGjhu4cgdsSDbiBwaMOybmcga2hvYS4KUGjDsm5nIMSQw6BvIHThuqFvCg==
+
+--===============5602815164584729471==
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: base64
+MIME-Version: 1.0
+
+PGh0bWw+PGJvZHk+CjxwPkNow6BvIGPDoWMgYuG6oW4gc2luaCB2acOqbiw8L3A+CjxwPlBow7Ju
+ZyDEkMOgbyB04bqhbyBn4butaSBs4buLY2ggdGhpIGN14buRaSBr4buzIGjhu41jIGvhu7MgMSAo
+ZmlsZSDEkcOtbmgga8OobSkuPC9wPgo8cD5Dw6FjIGLhuqFuIHhlbSBjaGkgdGnhur90IHBow7Ju
+ZyB0aGkgdOG6oWkgPGEgaHJlZj0iaHR0cHM6Ly9kYW90YW8udHJ1b25nZGFpaG9jLmV4YW1wbGUv
+bGljaC10aGkiPnRyYW5nIMSQw6BvIHThuqFvPC9hPi48L3A+CjxwPk3hu41pIHRo4bqvYyBt4bqv
+YyB2dWkgbMOybmcgbGnDqm4gaOG7hyB2xINuIHBow7JuZyBraG9hLjxicj5QaMOybmcgxJDDoG8g
+dOG6oW88L3A+CjwvYm9keT48L2h0bWw+Cg==
+
+--===============5602815164584729471==--
+
+--===============0871312753560920148==
+Content-Type: application/pdf
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="lich_thi_hk1.pdf"
+MIME-Version: 1.0
+
+JVBERi0xLjQgbWF1
+
+--===============0871312753560920148==--
